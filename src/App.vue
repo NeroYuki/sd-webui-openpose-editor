@@ -454,7 +454,7 @@ export default defineComponent({
       this.canvas.on('selection:cleared', selectionHandler);
       this.canvas.on('selection:updated', selectionHandler);
       this.canvas.on('mouse:down', hideKeypointHandler);
-      this.canvas.on('touch:gesture', keypointMoveTouchHandler);
+      this.canvas.on('touch:gesture' as any, keypointMoveTouchHandler as (e: any) => void);
 
       // Zoom handler.
       this.canvas.on('mouse:wheel', (opt: fabric.IEvent<WheelEvent>) => {
