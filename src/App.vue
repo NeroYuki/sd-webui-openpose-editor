@@ -426,6 +426,27 @@ export default defineComponent({
         this.canvas?.renderAll();
       };
 
+      const keypointMoveTouchHandler = (event: fabric.IEvent<TouchEvent>) => {
+        if (event.target === undefined)
+          return;
+
+        const target = event.target;
+        if (target instanceof fabric.ActiveSelection) {
+          // Group of points movement.
+          const t = target.calcTransformMatrix();
+          target.forEachObject(obj => {
+            if (obj instanceof OpenposeKeypoint2D) {
+              obj.updateConnections(t);
+            }
+          });
+        } else if (target instanceof OpenposeKeypoint2D) {
+          // Single keypoint movement.
+          target.updateConnections(IDENTITY_MATRIX);
+          this.updateKeypointProxy(target);
+        }
+        this.canvas?.renderAll();
+      };
+
       this.canvas.on('object:moving', keypointMoveHandler);
       this.canvas.on('object:scaling', keypointMoveHandler);
       this.canvas.on('object:rotating', keypointMoveHandler);
@@ -433,6 +454,7 @@ export default defineComponent({
       this.canvas.on('selection:cleared', selectionHandler);
       this.canvas.on('selection:updated', selectionHandler);
       this.canvas.on('mouse:down', hideKeypointHandler);
+      this.canvas.on('touch:gesture', keypointMoveTouchHandler);
 
       // Zoom handler.
       this.canvas.on('mouse:wheel', (opt: fabric.IEvent<WheelEvent>) => {
@@ -620,6 +642,14 @@ export default defineComponent({
       });
     },
     resizeHTMLCanvas() {
+      // check if window size is in md or lg breakpoint
+      if (window.innerWidth < 768) {
+        const htmlCanvasWidth = Math.round(window.innerWidth * 0.95);
+        const htmlCanvasHeight = Math.round(window.innerHeight * 0.6);
+        this._resizeHTMLCanvas(htmlCanvasWidth, htmlCanvasHeight);
+        return;
+      }
+      
       const htmlCanvasWidth = Math.round((window.innerWidth * 16 / 24) * 0.95);
       const htmlCanvasHeight = Math.round(window.innerHeight * 0.95);
       this._resizeHTMLCanvas(htmlCanvasWidth, htmlCanvasHeight);
@@ -1029,7 +1059,11 @@ export default defineComponent({
 
 <template>
   <a-row>
-    <a-col :span="8" id="control-panel">
+    <a-col :md="24" :lg="16" id="canvas-panel">
+      <canvas width="300px" height="300px" ref="editorCanvas"></canvas>
+    </a-col>
+
+    <a-col :md="24" :lg="8" id="control-panel">
       <Header></Header>
       <a-button v-if="modalId !== undefined" @click="sendCanvasAsFrameMessage">
         {{ $t('ui.sendPose') }}
@@ -1149,10 +1183,6 @@ export default defineComponent({
           </template>
         </OpenposeObjectPanel>
       </a-collapse>
-    </a-col>
-
-    <a-col :span="16" id="canvas-panel">
-      <canvas ref="editorCanvas"></canvas>
     </a-col>
   </a-row>
 </template>
