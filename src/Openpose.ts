@@ -1,6 +1,7 @@
 import { toRaw, markRaw } from 'vue';
 import { fabric } from 'fabric';
 import _ from 'lodash';
+import { useDeviceSizeStore } from './stores/counter';
 
 const IDENTITY_MATRIX = [1, 0, 0, 1, 0, 0];
 
@@ -13,6 +14,7 @@ class OpenposeKeypoint2D extends fabric.Circle {
     selected: boolean;
     selected_in_group: boolean;
     constant_radius: number;
+    shouldEnlargeRadius: boolean = false;
 
     constructor(
         x: number, y: number, confidence: number, color: string, name: string,
@@ -37,6 +39,7 @@ class OpenposeKeypoint2D extends fabric.Circle {
         this.selected = false;
         this.selected_in_group = false;
         this.constant_radius = constant_radius;
+        this.shouldEnlargeRadius = useDeviceSizeStore().isSmall;
 
         this.on('scaling', this._maintainConstantRadius.bind(this));
         this.on('skewing', this._maintainConstantRadius.bind(this));
@@ -136,6 +139,17 @@ class OpenposeKeypoint2D extends fabric.Circle {
         this.setCoords();
         other.setCoords();
     }
+
+    // containsPoint(point: fabric.Point, lines: any, absolute?: boolean, calculate?: boolean) {
+    //     var coords = this.getCoords(absolute, calculate)
+    //     const expandedRadius = this.constant_radius * (this.shouldEnlargeRadius ? 3 : 1) ;  // Expand the radius to make it easier to select.
+    //     const centerX = this.left! + this.radius!;
+    //     const centerY = this.top! + this.radius!;
+
+    //     //console.log(absolute, calculate);
+
+    //     return Math.pow(centerX - point.x, 2) + Math.pow(centerY - point.y, 2) < Math.pow(expandedRadius, 2);
+    // }
 };
 
 class OpenposeConnection extends fabric.Line {

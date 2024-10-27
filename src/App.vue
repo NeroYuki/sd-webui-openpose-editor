@@ -19,6 +19,7 @@ import type { UploadFile } from 'ant-design-vue';
 import LockSwitch from './components/LockSwitch.vue';
 import _ from 'lodash';
 import CryptoJS from 'crypto-js';
+import { useDeviceSizeStore } from './stores/counter';
 
 interface LockableUploadFile extends UploadFile {
   locked: boolean;
@@ -49,6 +50,8 @@ interface AppData {
 
   // The modal id to post message back to.
   modalId: string | undefined;
+
+  panningMode: boolean;
 };
 
 /**
@@ -349,6 +352,7 @@ export default defineComponent({
       activePersonId: undefined,
       activeBodyPart: undefined,
       modalId: undefined,
+      panningMode: false,
     };
   },
   setup() {
@@ -361,13 +365,21 @@ export default defineComponent({
         preserveObjectStacking: true,
         fireRightClick: true,
         stopContextMenu: true,
+        //targetFindTolerance: 50,
       }));
+
+      let zoomStartScale = 1.0;
+      let lastX : number | null = null;
+      let lastY : number | null = null;
+      let bounced = false
 
       this.resizeHTMLCanvas();
       this.canvas.add(this.openposeCanvas);
       // The openpose canvas should be at last layer.
       this.canvas.moveTo(this.openposeCanvas, 0);
       this.resizeOpenposeCanvas(this.canvasWidth, this.canvasHeight);
+      
+      useDeviceSizeStore().checkDeviceSize();
 
       // By default have a example person.
       this.addDefaultPerson();
@@ -411,6 +423,7 @@ export default defineComponent({
           });
         } else if (target instanceof OpenposeKeypoint2D) {
           // Single keypoint movement.
+          console.log('single key keypoint movement');
           target.updateConnections(IDENTITY_MATRIX);
           this.updateKeypointProxy(target);
         }
@@ -441,11 +454,93 @@ export default defineComponent({
           });
         } else if (target instanceof OpenposeKeypoint2D) {
           // Single keypoint movement.
+          console.log('single touch keypoint movement');
           target.updateConnections(IDENTITY_MATRIX);
           this.updateKeypointProxy(target);
         }
         this.canvas?.renderAll();
       };
+
+      
+      const handleGestureEvent = (event: any) => {
+        // handle pinch gesture event, zoom
+        if (event.e.touches && event.e.touches.length == 2) {
+            //pausePanning = true;
+            var point = new fabric.Point(event.self.x, event.self.y);
+            if (event.self.state == "start") {
+                zoomStartScale = this.canvas!.getZoom();
+            }
+            var delta = zoomStartScale * event.self.scale;
+            this.canvas!.zoomToPoint(point, delta);
+
+            // panning too why not
+            if (event.self.state == "end") {
+              lastX = null;
+              lastY = null;
+            }
+            else {
+              if (!lastX || !lastY) {
+                lastX = event.self.x;
+                lastY = event.self.y;
+              } else {
+                var deltaX = event.self.x - lastX;
+                var deltaY = event.self.y - lastY;
+                lastX = event.self.x;
+                lastY = event.self.y;
+                this.canvas!.relativePan(new fabric.Point(deltaX, deltaY));
+              }
+            }
+            
+        }
+      };
+
+      // // handle long press event, if not on point, enable panning mode, if on point, hide the keypoint
+      // const handleLongPressEvent = (event: fabric.IEvent<TouchEvent>) => {
+      //   console.log('long press event');
+      //   console.log(event);
+      //   if (event.target === undefined) {
+      //     if (bounced) {
+      //       bounced = false;
+      //       return;
+      //     }
+      //     else {
+      //       this.panningMode = true;
+      //     }
+      //     this.canvas!.selection = false;
+      //   } else {
+      //     console.log('long press on keypoint');
+      //     if (event.target instanceof OpenposeKeypoint2D) {
+      //       event.target._visible = false;
+      //       this.canvas?.renderAll();
+      //     }
+      //   }
+      // };
+
+      // const handleDragEvent = (event: any) => {
+      //   // handle drag event, panning
+      //   if (!event.e.touches || event.e.touches.length <= 0) {
+      //     console.log('cancel panning');
+      //     this.panningMode = false;
+      //     bounced = true;
+      //     lastX = null;
+      //     lastY = null;
+      //   }
+      //   else if (this.panningMode && event.e.touches.length == 1) {
+      //     console.log('panning');
+      //     if (!lastX || !lastY) {
+      //       console.log(event.e)
+      //       lastX = event.e.touches[0].clientX;
+      //       lastY = event.e.touches[0].clientY;
+      //     } else {
+      //       var deltaX = event.e.touches[0].clientX - lastX;
+      //       var deltaY = event.e.touches[0].clientY - lastY;
+      //       lastX = event.e.touches[0].clientX;
+      //       lastY = event.e.touches[0].clientY;
+      //       this.canvas!.relativePan(new fabric.Point(deltaX, deltaY));
+      //     }
+      //   }
+      // };
+
 
       this.canvas.on('object:moving', keypointMoveHandler);
       this.canvas.on('object:scaling', keypointMoveHandler);
@@ -455,6 +550,9 @@ export default defineComponent({
       this.canvas.on('selection:updated', selectionHandler);
       this.canvas.on('mouse:down', hideKeypointHandler);
       this.canvas.on('touch:gesture' as any, keypointMoveTouchHandler as (e: any) => void);
+      this.canvas.on('touch:gesture' as any, handleGestureEvent as (e: any) => void);
+      // this.canvas.on('touch:longpress' as any, handleLongPressEvent as (e: any) => void);
+      // this.canvas.on('touch:drag' as any, handleDragEvent as (e: any) => void);
 
       // Zoom handler.
       this.canvas.on('mouse:wheel', (opt: fabric.IEvent<WheelEvent>) => {

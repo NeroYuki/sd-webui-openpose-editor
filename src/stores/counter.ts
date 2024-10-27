@@ -10,3 +10,13 @@ export const useCounterStore = defineStore('counter', () => {
 
   return { count, doubleCount, increment }
 })
+
+// defineStore to check if device is small or not
+export const useDeviceSizeStore = defineStore('deviceSize', () => {
+  const isSmall = ref(false)
+  function checkDeviceSize() {
+    isSmall.value = window.innerWidth < 768
+  }
+
+  return { isSmall, checkDeviceSize }
+})
